@@ -1,0 +1,29 @@
+{
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "C/C++: xtensa-lx106-elf-gcc build active file",
+            "command": "/Users/ichinwilder/.platformio/packages/toolchain-xtensa/bin/xtensa-lx106-elf-gcc",
+            "args": [
+                "-g",
+                "${file}",
+                "-o",
+                "${fileDirname}/${fileBasenameNoExtension}",
+                "-mlongcalls",
+                "-mtext-section-literals"
+            ],
+            "options": {
+                "cwd": "/Users/ichinwilder/.platformio/packages/toolchain-xtensa/bin"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Generated task by Debugger"
+        }
+    ],
+    "version": "2.0.0"
+}

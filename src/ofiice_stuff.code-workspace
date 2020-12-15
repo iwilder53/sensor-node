@@ -1,0 +1,27 @@
+{
+	"folders": [
+		{
+			"name": "201101-165753-nodemcuv2",
+			"path": "../../201101-165753-nodemcuv2"
+		},
+		{
+			"name": "201118-120026-nodemcuv2",
+			"path": ".."
+		},
+		{
+			"name": "201130-011733-nodemcuv2",
+			"path": "../../201130-011733-nodemcuv2"
+		},
+		{
+			"name": "DHTBME",
+			"path": "../../DHTBME"
+		},
+		{
+			"name": "adc test",
+			"path": "../../Projects/adc test"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "201118-120026-nodemcuv2"
+	}
+}
