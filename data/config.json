@@ -3,14 +3,14 @@
         "ssid":"HetaDatain1",
         "password":"Test@Run_1",
     
-        "root":"574300659","id":"10",
+        "root":"574300659","id":"2",
     
         "mfd":"1","mcp":"1",
         "pins":"8","delay":"1",
-        "device_count":"5","sensor":"0",
+        "device_count":"5","sensor":"1",
         "mfd_dev_id_1":"1","mfd_dev_id_2":"2",
-        "mfd_dev_id_3":"4","mfd_dev_id_4":"5",
-        "mfd_dev_id_5":"15",
+        "mfd_dev_id_3":"3","mfd_dev_id_4":"4",
+        "mfd_dev_id_5":"5",
     
         "pin1min":"120","pin1max":"160",
         "pin2min":"120","pin2max":"160",

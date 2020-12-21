@@ -11,7 +11,7 @@
 #include<Arduino.h>
 
 #define DHTPIN D3
-#define DHTTYPE DHT22 
+//#define DHTTYPE DHT22 
 
 #define relayPin D4
 
@@ -862,7 +862,7 @@ void multi_mfd_read(){
 }
  void mbe ()
  { 
-   DHT dht(DHTPIN, DHTTYPE);
+   DHT dht(DHTPIN, 22 ,1);
    dht.begin();
    bme.takeForcedMeasurement();
    String readMbe;
