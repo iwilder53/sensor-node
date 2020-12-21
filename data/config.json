@@ -3,9 +3,9 @@
         "ssid":"HetaDatain1",
         "password":"Test@Run_1",
     
-        "root":"574300659","id":"11",
+        "root":"574300659","id":"10",
     
-        "mfd":"0","mcp":"1",
+        "mfd":"1","mcp":"1",
         "pins":"8","delay":"1",
         "device_count":"5","sensor":"0",
         "mfd_dev_id_1":"1","mfd_dev_id_2":"2",

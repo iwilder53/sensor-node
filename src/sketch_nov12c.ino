@@ -19,8 +19,8 @@
 
 #define MAX485_DE_RE      D4
 
-#define sendLed D8
-#define connLed LED_BUILTIN
+#define sendLed D1
+#define connLed D0
 
 #define CS_PIN D8
 #define CLOCK_PIN D5
@@ -86,6 +86,7 @@ void sendMsgSd();
 void blink_con_led();
 void sendPayload( String payload);
 void saveToCard();
+void updateLed();
 void sendMFD();
 
 void multi_mfd_read();
@@ -93,10 +94,11 @@ void trig_Relay(int thres ,int relay_max, int relay_min);
 
   
 void updateTime(){
-   // digitalWrite(connLed, LOW);
+    digitalWrite(sendLed, LOW);
     wdt++;
     ts_epoch++;
     rebootTime++;
+
   }
 
 void preTransmission(){
@@ -108,7 +110,7 @@ void postTransmission(){
    digitalWrite(MAX485_DE_RE, 0);
   }
   Task taskUpdateTime( TASK_SECOND * 1 , TASK_FOREVER, &updateTime );   // Set task second to send msg in a time interval (Here interval is 4 second)
-  Task taskConnLed( TASK_MILLISECOND * led_refresh  , TASK_FOREVER, &blink_con_led );
+  Task taskConnLed( TASK_MILLISECOND   , TASK_FOREVER, &blink_con_led );
   Task taskSendMessage( TASK_MINUTE * sendDelay , TASK_FOREVER, &sendMessage );   // Set task second to send msg in a time interval (Here interval is 4 second)
   Task taskSendMsgSd( TASK_SECOND * 3 , TASK_FOREVER, &sendMsgSd );   // Set task second to send msg in a time interval
   Task task_Multi_Mfd_Read(TASK_SECOND * 10, TASK_FOREVER, &multi_mfd_read );
@@ -116,6 +118,7 @@ void postTransmission(){
   Task taskReadMcp( TASK_MINUTE * sendDelay , TASK_FOREVER, &readMcp );
   Task taskReadMfd( TASK_MINUTE * sendDelay, TASK_FOREVER, &read_Mfd_Task );   // Set task second to send msg in a time interval (Here interval is 4 second)
   Task taskUpdateRssi( TASK_SECOND , TASK_FOREVER, &updateRssi );
+  Task taskUpdateLed( TASK_SECOND , TASK_FOREVER, &updateLed );
 
 
   void sendMessage() {
@@ -139,26 +142,27 @@ void receivedCallback( uint32_t from, String &msg ) {
             mesh.sendSingle(root, configFile);
             }
             taskConnLed.enable();
+            taskUpdateLed.enable();
 
  }
 
   void changedConnectionCallback() {
-  Serial.printf("Changed connections\n");
   Serial.printf("Changed connections\n");
   String nMap = mesh.asNodeTree().toString();
   mesh.sendSingle(root, nMap);
  }
 
   void nodeTimeAdjustedCallback(int32_t offset) {
-    Serial1.printf("Adjusted time %u. Offset = %d\n", mesh.getNodeTime(),offset);
+    Serial.printf("Adjusted time %u. Offset = %d\n", mesh.getNodeTime(),offset);
  }
 
  void delayReceivedCallback(uint32_t from, int32_t delay) {
-   Serial1.printf("Delay to node %u is %d us\n", from, delay);
+   Serial.printf("Delay to node %u is %d us\n", from, delay);
  }
 void droppedConnection(uint32_t node_id){
-
   taskConnLed.disable();
+  digitalWrite(connLed, LOW);
+  taskUpdateLed.disable();
 
 }
   void setup() {
@@ -349,7 +353,10 @@ File timeFile = LittleFS.open("time.txt", "r");
   userScheduler.addTask(taskReadMBE);
   userScheduler.addTask(taskReadMcp);
   userScheduler.addTask(taskUpdateRssi);
+  userScheduler.addTask(taskUpdateLed);
+
               taskConnLed.enable();
+              taskUpdateRssi.enable();
 
 if (mcp == 1){
   Serial.print("mcp activated");
@@ -392,15 +399,16 @@ if(smb == 1)
       while(1);
       } 
       if(rebootTime == 86400){
-        ESP.reset();
+       writeTimeToCard();
+       ESP.reset();
       }
 
-    if (period>60)                                                         // When period will be > 60 seconds, deep sleep mode will be active
+ /*   if (period>60)                                                         // When period will be > 60 seconds, deep sleep mode will be active
    {
       mesh.stop();
   ESP.deepSleep(60e6);                                                    // deepSleep mode will be active for 300*10^6 microseconds, i.e. for 300 seconds                                                         
   digitalWrite(LED_BUILTIN,HIGH); 
-   }
+   }*/
  }
 
   void readMcp()
@@ -423,11 +431,9 @@ if(smb == 1)
 }
 
 for(int j = 0; j < 8; j++){
-
         int k = mcpVals[j];
         mcpVals[j] = k / 10 ;
-
-}
+        }
  
   msgMcp +=  String(ts_epoch) + String(",") +String(id.c_str());
 
@@ -541,16 +547,22 @@ void writeTimeToCard()
     }  LittleFS.end();
 }
 
-void blink_con_led(){
+void blink_con_led(){  
+
 
   if(led_active == true){
-  digitalWrite(LED_BUILTIN, HIGH);
+  digitalWrite(connLed, HIGH);
+  delay(led_refresh);
+  digitalWrite(connLed,LOW);
+
   led_active = false;
   }
 
   else
   {
-    digitalWrite(LED_BUILTIN,LOW);
+    digitalWrite(connLed,LOW);
+    delay(led_refresh);
+    digitalWrite(connLed, HIGH);
     led_active = true;
   }
 
@@ -865,8 +877,12 @@ void multi_mfd_read(){
  readMbe.concat(",");
  readMbe.concat(String(bme.readHumidity()));
  readMbe.concat(",");
- readMbe.concat(String(bme.readPressure()));
+ readMbe.concat(String((bme.readPressure()*0.01 )*10.197162129779));
  readMbe.concat(",");
+
+// readMbe.concat(String(bme.readPressure()));
+
+ //readMbe.concat(",");
  readMbe.concat(String(dht.readTemperature()));
  readMbe.concat(",");
  readMbe.concat(String(dht.readHumidity()));
@@ -898,16 +914,36 @@ saveToCard(payload);
 
 
 void updateRssi(){
+
+  //Serial.print(String (WiFi.RSSI()));
   rssi = WiFi.RSSI();
   rssi = rssi* (-1);
-  if(rssi >= 40 && rssi <45 ){ led_refresh= 500; }
-  else  if(rssi >= 46 && rssi <50 ){ led_refresh= 650; }
-  else if(rssi >= 51 && rssi <55 ){ led_refresh= 800; }
-  else if(rssi >= 56 && rssi <60 ){ led_refresh= 1000; }
-  else if(rssi >= 61 && rssi <65 ){ led_refresh= 1300; }
- else if(rssi >= 66 && rssi <70 ){ led_refresh= 1600; }
- else if(rssi >= 71 && rssi <76 ){ led_refresh= 2000; }
-else if(rssi >= 81 && rssi <86 ){ led_refresh= 2200; }
+ // if(rssi == 31){ led_refresh= 200; }
+
+  if(rssi >= 40 && rssi <45 ){ led_refresh= 25; }
+  else  if(rssi >= 46 && rssi <50 ){ led_refresh= 50; }
+  else if(rssi >= 51 && rssi <55 ){ led_refresh= 50; }
+  else if(rssi >= 56 && rssi <60 ){ led_refresh= 50; }
+  else if(rssi >= 61 && rssi <65 ){ led_refresh= 100; }
+  else if(rssi >= 66 && rssi <70 ){ led_refresh= 150; }
+  else if(rssi >= 71 && rssi <76 ){ led_refresh= 500; }
+  else if(rssi >= 81 && rssi <86 ){ led_refresh= 1000; }
 // else if(rssi >= 91 && rssi <96 ){ led_refresh= 700; }
- else if (rssi> 91){led_refresh = 10000;}
+  else if (rssi> 91){led_refresh = 2000;}
+}
+
+void convertToTemp(int adcVal){
+float  temp;
+
+//temp = (0.5174 * adcVal) - 47.33;
+temp = (0.5687 * adcVal) - 49.895;
+
+Serial.print(temp);
+//Serial.print(",");
+}
+void updateLed(){
+
+digitalWrite(sendLed,HIGH);
+
+
 }
