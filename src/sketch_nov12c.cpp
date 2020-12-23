@@ -39,7 +39,9 @@ int rebootTime;
 //int mcp_relay_trigs[8][8];
 uint8_t mfd_read_pos = 0;
 int relay_pin_0_min, relay_pin_0_max,relay_pin_1_min, relay_pin_1_max,relay_pin_2_min, relay_pin_2_max,relay_pin_3_min, relay_pin_3_max,relay_pin_04_min, relay_pin_04_max,relay_pin_05_min, relay_pin_05_max,relay_pin_06_min, relay_pin_06_max,relay_pin_07_min, relay_pin_07_max;                               // Mesh Port should be same for all  nodes in Mesh Network
+  int bmeRelayMin, bmeRelayMax;
   int device_count;
+
   int mfd_dev_id[5];
   uint8_t sendDelay = 2;
   unsigned long period=0; 
@@ -412,7 +414,7 @@ if(smb == 1)
 
   void readMcp()
  {
-
+   digitalWrite(connLed, HIGH);
    MCP3008 adc(CLOCK_PIN, MOSI_PIN, MISO_PIN, CS_PIN);
   int mcpVals[pins];
    String msgMcp;
@@ -764,6 +766,7 @@ bool dataStream(int one ){
 }
 
 String readMfd( int mfd_dev_id){
+  digitalWrite(connLed,HIGH);
 
     node.begin(mfd_dev_id, Serial);
   String msgMfd; 
@@ -772,6 +775,7 @@ String readMfd( int mfd_dev_id){
   msgMfd += "," + id ;
   msgMfd += "," + String(2);
   msgMfd += "," + String(mfd_dev_id);
+  msgMfd += "," + String(1);
   msgMfd += "," + String(readWattageR(100)); 
   msgMfd += "," + String(readWattageR(102));
   msgMfd += "," + String(readWattageR(104));
@@ -800,10 +804,11 @@ String readMfd( int mfd_dev_id){
   return msgMfd;
   }
 String readMfd2(int mfd_dev_id){
+  digitalWrite(connLed,HIGH);
 
 String msgMfd2 = String(time_to_print) + "," + id + "," + String(2);
        msgMfd2 += "," + String(mfd_dev_id);
- 
+       msgMfd2 += "," + String(2);
     msgMfd2 += "," + String(readWattageR(148)); 
     msgMfd2 += "," + String(readWattageR(150)); 
     msgMfd2 += "," + String(readWattageR(152));
@@ -886,6 +891,7 @@ void multi_mfd_read(){
  readMbe.concat(",");
  readMbe.concat(String(dht.readHumidity()));
   sendPayload(readMbe);
+  trig_Relay(bme.readTemperature(),bmeRelayMax, bmeRelayMin);
  }
  void sendMFD(){
 
@@ -907,9 +913,11 @@ if (mesh.isConnected(root)){
    // digitalWrite(sendLed, HIGH);  
 
    mesh.sendSingle(root,String(payload));
- }else{
-saveToCard(payload);
-} wdt = 0;}
+   }else{
+      saveToCard(payload);
+      }
+      wdt = 0;
+      }
 
 
 void updateRssi(){
