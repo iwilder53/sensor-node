@@ -10,10 +10,10 @@
 #include "DHT.h"
 #include<Arduino.h>
 
-#define DHTPIN D3
+#define DHTPIN D4
 //#define DHTTYPE DHT22 
 
-#define relayPin D4
+#define relayPin D3
 
 #define MAX485_DE_RE D4
 
@@ -439,7 +439,7 @@ for(int j = 0; j < 8; j++){
   msgMcp +=  String(ts_epoch) + String(",") +String(id.c_str());
 
 msgMcp.concat(",");
-msgMcp.concat("7");
+msgMcp.concat("6");
 
 if(pins == 1 || pins > 1  ){
 
@@ -758,6 +758,8 @@ bool dataStream(int one ){
 
       first_Reg =node.getResponseBuffer(0);
       second_Reg =node.getResponseBuffer(1);
+    }else {
+      mfd_read_pos++;
     }
       }
       return true;
@@ -773,7 +775,7 @@ String readMfd( int mfd_dev_id){
 
   msgMfd = String(time_to_print);
   msgMfd += "," + id ;
-  msgMfd += "," + String(2);
+  msgMfd += "," + String(7);
   msgMfd += "," + String(mfd_dev_id);
   msgMfd += "," + String(1);
   msgMfd += "," + String(readWattageR(100)); 
@@ -806,9 +808,9 @@ String readMfd( int mfd_dev_id){
 String readMfd2(int mfd_dev_id){
   digitalWrite(connLed,HIGH);
 
-String msgMfd2 = String(time_to_print) + "," + id + "," + String(2);
-       msgMfd2 += "," + String(mfd_dev_id);
-       msgMfd2 += "," + String(2);
+String msgMfd2 = String(time_to_print) + "," + id + "," + String(7);
+    msgMfd2 += "," + String(mfd_dev_id);
+    msgMfd2 += "," + String(2);
     msgMfd2 += "," + String(readWattageR(148)); 
     msgMfd2 += "," + String(readWattageR(150)); 
     msgMfd2 += "," + String(readWattageR(152));
@@ -867,31 +869,33 @@ void multi_mfd_read(){
 }
  void mbe ()
  { 
-   DHT dht(DHTPIN, 22 ,1);
-   dht.begin();
+   //DHT dht(DHTPIN, 22 ,1);
+   //dht.begin();
    bme.takeForcedMeasurement();
    String readMbe;
  readMbe.concat(String(ts_epoch));
  readMbe.concat(",");
  readMbe.concat(id);
  readMbe.concat(",");
- readMbe.concat("6");
+ readMbe.concat("8");
  readMbe.concat(",");
  readMbe.concat(String(bme.readTemperature()));
  readMbe.concat(",");
  readMbe.concat(String(bme.readHumidity()));
  readMbe.concat(",");
  readMbe.concat(String((bme.readPressure()*0.01 )*10.197162129779));
+/*
  readMbe.concat(",");
-
 // readMbe.concat(String(bme.readPressure()));
 
  //readMbe.concat(",");
  readMbe.concat(String(dht.readTemperature()));
  readMbe.concat(",");
  readMbe.concat(String(dht.readHumidity()));
+ */
   sendPayload(readMbe);
   trig_Relay(bme.readTemperature(),bmeRelayMax, bmeRelayMin);
+
  }
  void sendMFD(){
 
