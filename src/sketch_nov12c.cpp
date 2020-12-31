@@ -32,6 +32,8 @@
 
 //objects declaraation
 Adafruit_BME280 bme;
+Adafruit_BME280 bme2;
+
 Scheduler userScheduler; // to control your personal task
 painlessMesh  mesh;
 ModbusMaster node;
@@ -320,7 +322,7 @@ File timeFile = LittleFS.open("time.txt", "r");
   mesh.onNewConnection(&newConnectionCallback);
   mesh.onChangedConnections(&changedConnectionCallback);
   mesh.onDroppedConnection(&droppedConnection);
-//declarations for scheduler
+//declarations for scheduler                                                                                                                                                                                                                                                                                          UwU
   userScheduler.addTask(taskSendMessage);
   userScheduler.addTask(taskUpdateTime);
   userScheduler.addTask(taskSendMsgSd);
@@ -345,6 +347,10 @@ if(smb == 1)
 		Serial.println("Could not find a valid BME280 sensor, check wiring!");
      }
      bme.MODE_FORCED;
+      if (!bme2.begin(0x77)) {
+		Serial.println("Could not find a valid BME280 sensor, check wiring!");
+     }
+     bme2.MODE_FORCED;
  }
   if(mfd == 1)
  {
@@ -848,6 +854,8 @@ void multi_mfd_read(){
  { 
 
    bme.takeForcedMeasurement();
+      bme2.takeForcedMeasurement();
+
    String readMbe;
  readMbe.concat(String(ts_epoch));
  readMbe.concat(",");
@@ -859,7 +867,13 @@ void multi_mfd_read(){
  readMbe.concat(",");
  readMbe.concat(String(bme.readHumidity()));
  readMbe.concat(",");
- readMbe.concat(String((bme.readPressure()*0.01 )*10.197162129779));
+ readMbe.concat(String((bme.readPressure()*0.01 )*10.197162129779)); 
+ readMbe.concat(",");
+ readMbe.concat(String(bme2.readTemperature()));
+ readMbe.concat(",");
+ readMbe.concat(String(bme2.readHumidity()));
+ readMbe.concat(",");
+ readMbe.concat(String((bme2.readPressure()*0.01 )*10.197162129779));
 
   sendPayload(readMbe);
   trig_Relay(bme.readTemperature(),bmeRelayMax, bmeRelayMin);
@@ -880,7 +894,7 @@ void saveToCard( String payload){
 }
 //sending data to root 
 void sendPayload( String payload){
-  Serial.print(payload);
+  Serial.println(payload);
 if (mesh.isConnected(root)){
    // digitalWrite(sendLed, HIGH);  
    taskSendMsgSd.enable();
