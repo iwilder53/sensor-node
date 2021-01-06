@@ -7,10 +7,17 @@
 
     "mfd":"0","mcp":"0",
     "pins":"8","delay":"1",
-    "device_count":"5","sensor":"1",
+    "device_count":"5","sensor":"0",
     "mfd_dev_id_1":"1","mfd_dev_id_2":"2",
     "mfd_dev_id_3":"4","mfd_dev_id_4":"5",
     "mfd_dev_id_5":"15",
+
+     "bme_min_temp":"0",
+   "bme_max_temp":"0",
+  "bme_min_hum":"0",
+  "bme_max_hum":"0",
+  "bme_prs_min":"0",
+  "bme_prs_max":"0",
 
     "pin1min":"120","pin1max":"160",
     "pin2min":"120","pin2max":"160",

@@ -13,11 +13,10 @@
 #include<Arduino.h>
 
 //definitons
-
+#define DHTPIN D2
 #define relayPin D3
-
 #define MAX485_DE_RE D4
-
+#define DHTTYPE DHT22  
 #define sendLed D1
 #define connLed D0
 
@@ -32,7 +31,7 @@
 
 //objects declaraation
 Adafruit_BME280 bme;
-Adafruit_BME280 bme2;
+DHT dht(DHTPIN, 22);
 
 Scheduler userScheduler; // to control your personal task
 painlessMesh  mesh;
@@ -91,7 +90,7 @@ void sendMFD();
 void updateRssi();
 
 void multi_mfd_read();
-void trig_Relay(int thres ,int relay_max, int relay_min);
+boolean trig_Relay(int thres ,int relay_max, int relay_min);
 
   
 void updateTime(){            //will update time from root && also watchdog 
@@ -295,7 +294,13 @@ Serial.println(relay_pin_07_max );
   const char* MFD_SERIAL_ID_5 = doc["mfd_dev_id_5"];
   mfd_dev_id[4] = atoi(MFD_SERIAL_ID_5);
   Serial.println(mfd_dev_id[4]);
-  
+    const char* bme_temp_min = doc["bme_min_temp"];
+  const char* bme_temp_max = doc["bme_max_temp"];
+  const char* bme_hum_min = doc["bme_min_hum"];
+  const char* bme_hum_max = doc["bme_max_hum"];
+  const char* bme_prs_min = doc["bme_prs_min"];
+  const char* bme_prs_max = doc["bme_prs_max"];
+
   const char*  SMB = doc["sensor"];
   smb= atoi(SMB);
 
@@ -347,10 +352,9 @@ if(smb == 1)
 		Serial.println("Could not find a valid BME280 sensor, check wiring!");
      }
      bme.MODE_FORCED;
-      if (!bme2.begin(0x77)) {
-		Serial.println("Could not find a valid BME280 sensor, check wiring!");
-     }
-     bme2.MODE_FORCED;
+    
+
+
  }
   if(mfd == 1)
  {
@@ -457,11 +461,12 @@ trig_Relay(mcpVals[6], relay_pin_06_max, relay_pin_06_min );
 
 msgMcp += String(",") + String(mcpVals[7]); 
 trig_Relay(mcpVals[7], relay_pin_07_max, relay_pin_07_min );
+if(trig_Relay){msgMcp += "1";}
 }
 sendPayload(msgMcp);
  }
 //for triggering the relay based on adc parameters
-void trig_Relay(int thres ,int relay_max, int relay_min)
+boolean trig_Relay(int thres ,int relay_max, int relay_min)
 {
  if (thres >= relay_max || thres <= relay_min)
   {
@@ -470,6 +475,7 @@ void trig_Relay(int thres ,int relay_max, int relay_min)
  else
   {
     digitalWrite(relayPin, HIGH);
+    return true;
   }
 
 }
@@ -852,9 +858,8 @@ void multi_mfd_read(){
 //For sending bmp280 data 
  void mbe ()
  { 
-
+   dht.begin();
    bme.takeForcedMeasurement();
-      bme2.takeForcedMeasurement();
 
    String readMbe;
  readMbe.concat(String(ts_epoch));
@@ -869,11 +874,11 @@ void multi_mfd_read(){
  readMbe.concat(",");
  readMbe.concat(String((bme.readPressure()*0.01 )*10.197162129779)); 
  readMbe.concat(",");
- readMbe.concat(String(bme2.readTemperature()));
+ readMbe.concat(String(dht.readTemperature()));
  readMbe.concat(",");
- readMbe.concat(String(bme2.readHumidity()));
- readMbe.concat(",");
- readMbe.concat(String((bme2.readPressure()*0.01 )*10.197162129779));
+ readMbe.concat(String(dht.readHumidity()));
+ //readMbe.concat(",");
+ //readMbe.concat(String((dht.readPressure()*0.01 )*10.197162129779));
 
   sendPayload(readMbe);
   trig_Relay(bme.readTemperature(),bmeRelayMax, bmeRelayMin);
