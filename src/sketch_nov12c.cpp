@@ -2,7 +2,6 @@
 
 #include "painlessMesh.h"
 #include <MCP3008.h>
-#include <LittleFS.h>
 #include "FS.h"
 #include <Arduino.h>
 #include <ModbusMaster.h>
@@ -13,6 +12,9 @@
 #include<Arduino.h>
 
 //definitons
+#if ESP8266
+#include <LittleFS.h>
+
 #define DHTPIN D2
 #define relayPin D3
 #define MAX485_DE_RE D4
@@ -24,7 +26,21 @@
 #define CLOCK_PIN D5
 #define MOSI_PIN D7
 #define MISO_PIN D6
+#else
+#include<SPIFFS.h>
+#define DHTPIN 4
+#define relayPin 13
+#define MAX485_DE_RE 5
+#define DHTTYPE DHT22  
+#define sendLed 32
+#define connLed 2
 
+#define CS_PIN 5
+#define CLOCK_PIN 18
+#define MOSI_PIN 23
+#define MISO_PIN 19
+#include <AsyncTCP.h>
+#endif
 #define   MESH_PORT       5555                                      // Mesh Port should be same for all  nodes in Mesh Network
 
 
@@ -40,7 +56,7 @@ ModbusMaster node;
 //variables
 uint8_t mfd_read_pos = 0;
   int relay_pin_0_min, relay_pin_0_max,relay_pin_1_min, relay_pin_1_max,relay_pin_2_min, relay_pin_2_max,relay_pin_3_min, relay_pin_3_max,relay_pin_04_min, relay_pin_04_max,relay_pin_05_min, relay_pin_05_max,relay_pin_06_min, relay_pin_06_max,relay_pin_07_min, relay_pin_07_max;                               // Mesh Port should be same for all  nodes in Mesh Network
-  int bmeRelayMin, bmeRelayMax;
+  int bmeRelay_t_Min, bmeRelay_t_Max,bmeRelay_p_Max,bmeRelay_h_Max,bmeRelay_h_Min,bmeRelay_p_Min;
   int device_count;
   int mfd_dev_id[5];
   uint8_t sendDelay = 2;
@@ -84,13 +100,14 @@ void updateTime();
 void sendMessage() ;
 void sendMsgSd();
 void blink_con_led();
-void sendPayload( String payload);
+void sendPayload( String &payload);
 void saveToCard();
 void sendMFD();
 void updateRssi();
 
 void multi_mfd_read();
 boolean trig_Relay(int thres ,int relay_max, int relay_min);
+boolean trig_Relay_bme(int thres ,int relay_max, int relay_min );
 
   
 void updateTime(){            //will update time from root && also watchdog 
@@ -98,16 +115,17 @@ void updateTime(){            //will update time from root && also watchdog
     wdt++;
     ts_epoch++;
     rebootTime++;
+  //Serial.println(WiFi.RSSI());
 
   }
 
 //Declarations for tasks scheduling 
   Task taskUpdateTime( TASK_SECOND * 1 , TASK_FOREVER, &updateTime );   // Set task second to send msg in a time interval (Here interval is 4 second)
   Task taskConnLed( TASK_MILLISECOND   , TASK_FOREVER, &blink_con_led );
-  Task taskSendMessage( TASK_MINUTE * sendDelay , TASK_FOREVER, &sendMessage );   // Set task second to send msg in a time interval (Here interval is 4 second)
+  Task taskSendMessage( TASK_SECOND , TASK_FOREVER, &sendMessage );   // Set task second to send msg in a time interval (Here interval is 4 second)
   Task taskSendMsgSd( TASK_SECOND * 3 , TASK_FOREVER, &sendMsgSd );   // Set task second to send msg in a time interval
-  Task task_Multi_Mfd_Read(TASK_SECOND * 10, TASK_FOREVER, &multi_mfd_read );
-  Task taskReadMBE( TASK_MINUTE * sendDelay , TASK_FOREVER, &mbe );
+  Task task_Multi_Mfd_Read(TASK_SECOND * 15, TASK_FOREVER, &multi_mfd_read );
+  Task taskReadMBE( TASK_SECOND * 10 , TASK_FOREVER, &mbe );
   Task taskReadMcp( TASK_MINUTE * sendDelay , TASK_FOREVER, &readMcp );
   Task taskReadMfd( TASK_MINUTE * sendDelay, TASK_FOREVER, &read_Mfd_Task );   // Set task second to send msg in a time interval (Here interval is 4 second)
   Task taskUpdateRssi( TASK_SECOND , TASK_FOREVER, &updateRssi );
@@ -115,6 +133,7 @@ void updateTime(){            //will update time from root && also watchdog
 
   void sendMessage() {
   // digitalWrite(sendLed, HIGH);  // for testing  && debugging
+  Serial.print(WiFi.RSSI());
   }
 
 
@@ -300,6 +319,13 @@ Serial.println(relay_pin_07_max );
   const char* bme_hum_max = doc["bme_max_hum"];
   const char* bme_prs_min = doc["bme_prs_min"];
   const char* bme_prs_max = doc["bme_prs_max"];
+  bmeRelay_t_Min = atoi(bme_temp_min);
+  bmeRelay_t_Max = atoi(bme_temp_max);
+  bmeRelay_p_Min = atoi(bme_prs_min);
+  bmeRelay_p_Max = atoi(bme_prs_max);
+  bmeRelay_h_Min = atoi(bme_hum_min);
+  bmeRelay_h_Max = atoi(bme_hum_max);
+  
 
   const char*  SMB = doc["sensor"];
   smb= atoi(SMB);
@@ -319,7 +345,10 @@ File timeFile = LittleFS.open("time.txt", "r");
     timeFile.close();
     }
   LittleFS.end();
+
   //start the mesh
+  mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
+
   mesh.init( MESH_PREFIX, MESH_PASSWORD, &userScheduler, MESH_PORT );
   mesh.setContainsRoot(true);
 
@@ -376,7 +405,7 @@ if(smb == 1)
   void loop() {
    // it will run the  scheduler as well
 
- updateRssi(); //maintains the led flash frequency
+ //updateRssi(); //maintains the led flash frequency
 
     mesh.update();      //scheduler for mesh as well user
 
@@ -460,24 +489,26 @@ trig_Relay(mcpVals[6], relay_pin_06_max, relay_pin_06_min );
 }if(pins == 8 || pins > 8  ){
 
 msgMcp += String(",") + String(mcpVals[7]); 
-trig_Relay(mcpVals[7], relay_pin_07_max, relay_pin_07_min );
-if(trig_Relay){msgMcp += "1";}
+trig_Relay(mcpVals[7], relay_pin_07_max, relay_pin_07_min     );
+
 }
 sendPayload(msgMcp);
  }
 //for triggering the relay based on adc parameters
-boolean trig_Relay(int thres ,int relay_max, int relay_min)
+boolean trig_Relay(int thres ,int relay_max, int relay_min )
 {
  if (thres >= relay_max || thres <= relay_min)
   {
-    digitalWrite(relayPin, HIGH);
+    digitalWrite(relayPin, 0x00);
+        return true;
+
   } 
  else
   {
-    digitalWrite(relayPin, HIGH);
-    return true;
-  }
+    digitalWrite(relayPin, 0x01);
 
+  }
+ 
 }
 
 
@@ -860,29 +891,43 @@ void multi_mfd_read(){
  { 
    dht.begin();
    bme.takeForcedMeasurement();
-
+  int prs = (bme.readPressure()*0.01 )*10.197162129779;
    String readMbe;
+   if(ts_epoch < 1611040428){
+readMbe.concat("notime");
+readMbe.concat(",");
+
+   }
  readMbe.concat(String(ts_epoch));
  readMbe.concat(",");
  readMbe.concat(id);
  readMbe.concat(",");
  readMbe.concat("8");
+ /*readMbe.concat(",");
+ readMbe.concat(String(bme.readTemperature()));
+ readMbe.concat(",");
+ readMbe.concat(String(bme.readHumidity()));
+ readMbe.concat(",");
+ readMbe.concat(String((bme.readPressure()*0.01 )*10.197162129779)); */
  readMbe.concat(",");
  readMbe.concat(String(bme.readTemperature()));
  readMbe.concat(",");
  readMbe.concat(String(bme.readHumidity()));
  readMbe.concat(",");
- readMbe.concat(String((bme.readPressure()*0.01 )*10.197162129779)); 
- readMbe.concat(",");
- readMbe.concat(String(dht.readTemperature()));
- readMbe.concat(",");
- readMbe.concat(String(dht.readHumidity()));
- //readMbe.concat(",");
- //readMbe.concat(String((dht.readPressure()*0.01 )*10.197162129779));
-
+ readMbe.concat(String((bme.readPressure()*0.01 )*10.197162129779));
+  readMbe.concat(",");
+if(trig_Relay(bme.readTemperature(),bmeRelay_t_Max, bmeRelay_t_Min)){readMbe.concat("1");}else{readMbe.concat("0");}
+  readMbe.concat(",");
+  if(trig_Relay(bme.readHumidity(),bmeRelay_h_Max, bmeRelay_h_Min)){readMbe.concat("1");}else{readMbe.concat("0");}
+  readMbe.concat(",");
+ if(trig_Relay(prs,bmeRelay_p_Max, bmeRelay_p_Min)){readMbe.concat("1");}else{readMbe.concat("0");}
+  readMbe.concat(",");
+if(trig_Relay(bme.readTemperature() ,bmeRelay_t_Max,bmeRelay_t_Min) || trig_Relay(bme.readHumidity(),bmeRelay_h_Max,bmeRelay_h_Min) || trig_Relay(prs,bmeRelay_p_Max,bmeRelay_p_Min)){
+  digitalWrite(relayPin, HIGH);
+}else{
+  digitalWrite(relayPin,LOW);
+}
   sendPayload(readMbe);
-  trig_Relay(bme.readTemperature(),bmeRelayMax, bmeRelayMin);
-
  }
  void sendMFD(){
    //digitalWrite(sendLed, HIGH);  
@@ -890,7 +935,7 @@ void multi_mfd_read(){
   sendPayload(msgMfd_payload1);
   }
 //writing data to card 
-void saveToCard( String payload){
+void saveToCard( String &payload){
     LittleFS.begin();
     File dataFile = LittleFS.open("offlinelog.txt","a");
     dataFile.println(payload);
@@ -898,7 +943,7 @@ void saveToCard( String payload){
     LittleFS.end();
 }
 //sending data to root 
-void sendPayload( String payload){
+void sendPayload( String &payload){
   Serial.println(payload);
 if (mesh.isConnected(root)){
    // digitalWrite(sendLed, HIGH);  
@@ -925,4 +970,20 @@ void updateRssi(){
   else if(rssi >= 71 && rssi <76 ){ led_refresh= 500; }
   else if(rssi >= 81 && rssi <86 ){ led_refresh= 1000; }
   else if (rssi> 91){digitalWrite(connLed, LOW);}
+}
+//for triggering the relay based on adc parameters
+boolean trig_Relay_bme(int thres ,int relay_max, int relay_min )
+{
+ if (thres >= relay_max || thres <= relay_min)
+  {
+    digitalWrite(relayPin, 0x00);
+    
+  } 
+ else
+  {
+    digitalWrite(relayPin, 0x01);
+
+    return true;
+  }
+ 
 }
